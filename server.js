@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import { ChatGroq } from "@langchain/groq"
 import { context } from "@langchain/core/utils/context";
+import { Annotation, StateGraph } from "@langchain/langgraph";
 dotenv.config();
 
 const PORT=process.env.PORT;
@@ -18,10 +19,36 @@ const llm = new ChatGroq({
 
 })
 
+const state=Annotation.Root({
+    prompt:Annotation,
+    aimsg:Annotation
+
+})
+
+const callLLM=async (state)=>{
+    console.log(state)
+     const response=await llm.invoke(state.prompt)
+    
+     return {aimsg:response.content};
+
+}
+
+const graph=new StateGraph(state)
+.addNode("agent",callLLM)
+.addEdge("__start__","agent")
+.addEdge("agent","__end__")
+.compile()
+
+
+
+
+
+
 app.post("/ai",async(req,res)=>{
     const {input}=req.body;
-    const response=await llm.invoke(input)
-    res.status(200).json({"message":response.content});
+     const response=await graph.invoke({prompt:input});
+      console.log(response)
+    res.status(200).json({"message":response.aimsg});
 
 })
 
