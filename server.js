@@ -3,12 +3,17 @@ import dotenv from "dotenv";
 import { ChatGroq } from "@langchain/groq"
 import { context } from "@langchain/core/utils/context";
 import { Annotation, StateGraph } from "@langchain/langgraph";
+import { ToolNode } from "@langchain/langgraph/prebuilt";
+
 dotenv.config();
 
 const PORT=process.env.PORT;
 const app=express();
 
 app.use(express.json());
+
+// const tools=[];
+// const toolNode=new ToolNode(tools);
 
 const llm = new ChatGroq({
    apiKey: process.env.GROQ_API_KEY,
@@ -27,7 +32,17 @@ const state=Annotation.Root({
 
 const callLLM=async (state)=>{
     console.log(state)
-     const response=await llm.invoke(state.prompt)
+     const response=await llm.invoke([
+        {
+            role:"system",
+            content:"if you dont know then use relavent tools "
+        },
+        {
+            role:"human",
+            content:state.prompt
+
+        }
+     ])
     
      return {aimsg:response.content};
 
@@ -35,6 +50,7 @@ const callLLM=async (state)=>{
 
 const graph=new StateGraph(state)
 .addNode("agent",callLLM)
+.addNode("tools",ToolNode)
 .addEdge("__start__","agent")
 .addEdge("agent","__end__")
 .compile()
